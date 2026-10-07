@@ -1,0 +1,87 @@
+[project]
+name = "yolo-cardetect"
+version = "0.1.0"
+description = "Detect 1:64-scale Hot Wheels cars passing a street and estimate their velocity from a single pole-mounted camera"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Ramon" }]
+keywords = ["yolo", "vehicle-detection", "speed-estimation", "homography", "edge", "raspberry-pi"]
+
+# @note Dependency layering is deliberate, because the primary deployment target is a
+#       Raspberry Pi Zero 2 W with 512 MB of RAM:
+#
+#         * the core (geometry, speed) needs only numpy, so it can be imported and tested
+#           on a stripped-down device without torch ever being resident in memory.
+#         * opencv and ultralytics are the heavyweight inference layer.  They are regular
+#           dependencies here for convenience on a workstation, but every import of them
+#           inside the package is deferred so that `import cardetect.geometry` never pulls
+#           them in.
+#         * `lap` is NOT optional despite not being a dependency of ultralytics itself.
+#           Ultralytics imports it lazily inside the tracker modules, so its absence only
+#           surfaces at the moment tracking starts -- a confusing runtime failure.  It is
+#           pinned here so a fresh environment cannot hit that.
+dependencies = [
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Full detection + tracking stack (workstation, Orange Pi 3B).
+vision = [
+    "ultralytics>=8.4.174",
+    "opencv-python>=4.10",
+    "lap>=0.5.12",
+]
+# Calibration helpers only: no torch, no model downloads.
+calibration = [
+    "opencv-python>=4.10",
+]
+# Edge deployment helpers for Orange Pi RKNN export.
+edge = [
+    "ultralytics>=8.4.174",
+    "onnx>=1.17",
+    "onnxruntime>=1.20",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "opencv-python>=4.10",
+    "ultralytics>=8.4.174",
+    "lap>=0.5.12",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+cardetect = "cardetect.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cardetect"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# @note The geometry suite runs headless and must pass with numpy alone; OpenCV-dependent
+#       tests use importorskip so a core-only environment still gets meaningful signal.
+addopts = "-q --strict-markers"
+markers = [
+    "gpu: requires MPS/CUDA acceleration",
+    "camera: requires a physical camera device",
+    "model: downloads YOLO weights",
+    "slow: takes more than a few seconds",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    # @note Docstrings follow the project's rich-comment convention (@brief/@details/@param/
+    #       @return), which does not match pydocstyle's expected layout.
+    "D",
+]

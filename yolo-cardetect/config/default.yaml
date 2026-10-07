@@ -1,0 +1,159 @@
+# Runtime defaults shared by both mounting configurations.
+#
+# @file    default.yaml
+# @brief   Default detection, tracking, speed and output settings.
+# @details Merged first, then overridden by a camera configuration file.  The split exists so
+#          that swapping between the overhead and roadside rigs never risks silently changing
+#          detector or tracker behaviour: those settings live here and are only overridable
+#          deliberately.
+#
+# Loaded with:  cardetect run --config config/camera_topdown.yaml
+
+# --- Detector ---------------------------------------------------------------------------
+detector:
+  # @note yolo26n is the current state of the art in the Ultralytics family and its STAL label
+  #       assignment specifically targets small objects, which is the regime a 1:64 Hot Wheels
+  #       car occupies.  Swap to yolo11n.pt or yolov8n.pt for compatibility with older
+  #       tutorials, or to an NCNN/ONNX/RKNN export for a Raspberry Pi or Orange Pi.
+  model: yolo26n.pt
+
+  # @note 640 is the model's native training size.  On a Pi Zero 2 W drop to 320 or 416: the
+  #       wider field per pixel costs accuracy on a toy-sized object, but the frame rate gain
+  #       matters more than the mAP there, and the ground resolution below is usually the
+  #       binding constraint on speed accuracy anyway.
+  imgsz: 640
+
+  conf: 0.25
+  iou: 0.5
+
+  # @note COCO vehicle classes.  Deliberately excludes 'person' and the two-wheelers by default:
+  #       a person walking across the track would otherwise be tracked as a vehicle and would
+  #       contribute a spurious speed.  Add 3 and 5 if motorcycles or buses are wanted.
+  #       2=car, 5=bus, 7=truck
+  classes: [2, 5, 7]
+
+  # Device selection: 'auto' prefers CUDA, then Apple MPS, then CPU.  On the Pi and Orange Pi
+  # this resolves to CPU (or the NPU when an RKNN model is supplied).
+  device: auto
+
+  # @note Precision mode.  'auto' enables 16-bit precision only on CUDA, where it is a real
+  #       speedup; on CPU it is slower and less accurate, so 'auto' correctly leaves CPU at FP32.
+  #       Allowed: auto, off, 16, 8.  Use 8 only with a quantized (INT8) model.
+  #       This replaced the older `half` flag, which this Ultralytics version deprecates with a
+  #       per-call warning -- prohibitively noisy at thirty frames per second.
+  quantize: auto
+
+  # @note Use the NMS-free one-to-one head.  Ultralytics defaults to the one-to-many head for a
+  #       little extra accuracy, but the one-to-one head removes a post-processing pass, which
+  #       is a worthwhile trade for a single-class-ish detection problem on constrained hardware.
+  nms_free: false
+
+# --- Tracker ----------------------------------------------------------------------------
+tracker:
+  # bytetrack is the default: it is a motion-only tracker, so it needs no appearance model and
+  # costs almost nothing, which matters at 2-4 FPS on a Pi Zero.  bot-sort adds appearance
+  # re-identification and is worth the cost only when cars are frequently occluded.
+  type: bytetrack          # bytetrack | bot-sort
+  track_high_thresh: 0.25
+  track_low_thresh: 0.1
+  new_track_thresh: 0.25
+  track_buffer: 30          # frames a lost track is kept before being dropped
+  match_thresh: 0.8
+  # bot-sort only:
+  with_reid: false
+  proximity_thresh: 0.5
+  appearance_thresh: 0.25
+
+# --- Detection point selection ----------------------------------------------------------
+# @note Where on a detection box the vehicle's contact with the road is taken to be.  This is
+#       the single largest systematic error source in monocular speed estimation: projecting the
+#       box centre places the vehicle's roof on the road *ahead* of it, biasing every speed high.
+detection_point:
+  # bottom_center  : bottom edge centre (default; the ground contact patch of a box)
+  # bottom_third   : bottom edge, one third in from the left, which reduces the bias for
+  #                  vehicles seen from a rear three-quarter view
+  # center         : box centre, provided only for comparison and NOT recommended
+  mode: bottom_center
+  # @note The bottom edge of a detector box is a few pixels above the true contact patch
+  #       because of the vehicle's own shadow and the tyre-to-box gap.  A positive value here
+  #       moves the reference point that many pixels *down* the image, toward the contact patch.
+  bottom_offset_px: 0.0
+
+# --- Speed estimation -------------------------------------------------------------------
+speed:
+  # @note 0.5 s suits a table-top track where a car crosses the view in about a second.  On a
+  #       real street at 30-60 FPS, reduce to 0.2-0.3 s so the estimate stays local to what the
+  #       car is doing now.
+  window_s: 0.5
+  min_span_s: 0.08
+  # Largest believable ground displacement between consecutive frames.  At 30 FPS a 5 m/s car
+  # moves 0.17 m per frame; 0.5 m leaves generous headroom while still catching identity switches.
+  max_step_m: 0.5
+  min_samples: 3
+  max_speed_mps: 12.0
+  use_smoothing: true
+  robust_percentile: 50.0
+  # @note Detector box jitter in pixels, used only to report the achievable noise floor.  A YOLO
+  #       box on a toy-sized object is realistically good to a few pixels; setting this
+  #       pessimistically makes the reported floor conservative, which is the safer direction.
+  pixel_sigma_px: 2.0
+
+# --- Validity gating --------------------------------------------------------------------
+validity:
+  # @note Reject ground positions whose positional error exceeds this.  The mechanism that keeps
+  #       one noisy far-field sample from dominating a speed built from a handful of frames.
+  #       Loosen for a longer sight line, tighten if speeds look erratic at range.
+  max_error_m: 0.05
+  # Reject detections whose box is smaller than this, in pixels.  A car 3 px wide cannot support
+  # a meaningful ground-contact estimate, and admitting it adds noise without adding information.
+  min_box_px: 6
+  # Reject detections whose box is implausibly large, typically a mis-detection of the track itself.
+  max_box_fraction: 0.9
+
+# --- Input / capture --------------------------------------------------------------------
+source:
+  # Overridden by --source on the command line.  0 is the first camera device.
+  uri: 0
+  # @note Resolved from the first frame when null.  A Raspberry Pi Camera Module reports an
+  #       unreliable CAP_PROP_FPS, and the speed estimator uses real timestamps rather than
+  #       frame_index/fps precisely because of that.
+  fps: null
+  width: null
+  height: null
+  # @note Motion-triggered burst capture, for devices that cannot process video continuously.
+  #       'stream' analyses every frame as it arrives; 'burst' watches for motion cheaply, then
+  #       captures a short high-frame-rate clip around the event and analyses that.  Since speed
+  #       is a per-track quantity, burst mode loses nothing: only the frames containing a car
+  #       matter, and they are exactly the frames captured.
+  mode: stream              # stream | burst
+  burst_seconds: 2.0
+  burst_preroll_s: 0.3
+  motion_threshold: 0.02    # fraction of changed pixels that arms a burst
+  # Frames are dropped rather than queued when processing cannot keep up, so latency stays bounded
+  # and timestamps stay meaningful.  On a Pi the queue is effectively always empty.
+  queue_size: 1
+
+# --- Output -----------------------------------------------------------------------------
+output:
+  directory: runs
+  # Directory naming uses the run start time so repeat runs never overwrite each other.
+  run_name: null            # null -> YYYYMMDD-HHMMSS
+  video: true               # write the annotated video
+  csv: true                 # one row per (track, frame) measurement
+  summary_json: true        # one record per track, with the final speed and diagnostics
+  plots: true               # speed-versus-time plot per track
+  minimap: true             # bird's-eye trajectory inset, where the rig geometry allows it
+  # @note Drawing every historical trajectory segment is O(tracks x frames) and becomes the
+  #       bottleneck on a Pi long before the detector does.
+  trail_length: 30
+  display: false            # show a live window (needs a display; off for headless Pi use)
+  log_every: 30             # frames between progress log lines
+  csv_flush_every: 100      # rows buffered before flushing, so a crash loses at most this many
+
+# --- Visualisation scale ----------------------------------------------------------------
+visualisation:
+  # Seconds of history shown in the live speed readout, and the y-axis ceiling for plots.
+  speed_plot_window_s: 5.0
+  speed_plot_max_mps: 8.0
+  font_scale: 0.5
+  line_thickness: 2

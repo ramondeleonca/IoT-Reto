@@ -1,0 +1,66 @@
+{
+  "config": {
+    "kind": "topdown",
+    "label": "overhead-pole",
+    "projector": {
+      "kind": "topdown",
+      "label": "overhead-pole",
+      "m_per_px": 0.0009299631366847706,
+      "anisotropy": 1.0,
+      "source": "height_over_focal_length"
+    },
+    "detector": {
+      "model": "yolo26n.pt",
+      "imgsz": 640,
+      "conf": 0.25,
+      "classes": [
+        "car",
+        "bus",
+        "truck"
+      ],
+      "device": "mps",
+      "quantize": null,
+      "nms_free": false,
+      "contact_point": "bottom_center",
+      "bottom_offset_px": 0.0
+    }
+  },
+  "run": {
+    "frames": 56,
+    "elapsed_s": 1.7132252919254825,
+    "stats": {
+      "frames": 56,
+      "live_tracks": 0,
+      "retired_tracks": 0,
+      "rejected_projections": 0,
+      "detector": {
+        "model": "yolo26n.pt",
+        "imgsz": 640,
+        "conf": 0.25,
+        "classes": [
+          "car",
+          "bus",
+          "truck"
+        ],
+        "device": "mps",
+        "quantize": null,
+        "nms_free": false,
+        "contact_point": "bottom_center",
+        "bottom_offset_px": 0.0
+      },
+      "source": {
+        "uri": "samples/synthetic_topdown.mp4",
+        "live": false,
+        "mode": "stream",
+        "reported_fps": 30.0,
+        "frame_count": 56,
+        "timestamp_source": "frame_index / fps (file)",
+        "size": [
+          1280,
+          720
+        ]
+      }
+    }
+  },
+  "tracks": {}
+}

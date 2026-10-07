@@ -1,0 +1,74 @@
+# Configuration A -- camera on a pole ABOVE the track, pitched down.
+#
+# @file    camera_topdown.yaml
+# @brief   Overhead mounting configuration.
+# @details Recommended for a table-top Hot Wheels layout, because the near-orthographic view
+#          gives a *constant* metres-per-pixel across the whole frame.  Speed error therefore
+#          does not depend on where the car happens to be, which is not true of the roadside rig.
+#
+#          Two calibration routes are provided, in increasing order of effort and accuracy:
+#
+#            1. height_m            -- needs only a tape measure against the pole, and is exact
+#                                      when the camera really does point straight down.  Start
+#                                      here.
+#            2. reference_points_xy -- two clicked marks a measured distance apart, for when the
+#                                      camera is tilted enough that the height route is biased.
+#
+#          A stored calibration (written by `cardetect calibrate topdown`) takes precedence over
+#          both, because it records a physical measurement of one specific rig.
+#
+# Loaded with:  cardetect run --config config/camera_topdown.yaml
+
+kind: topdown
+label: overhead-pole
+
+# --- Camera intrinsics ------------------------------------------------------------------
+# @note Taken from the sensor's quoted field of view, which is the only figure camera datasheets
+#       reliably provide.  Square pixels are assumed (fy = fx), true for essentially every modern
+#       CMOS sensor.  If a lens is wide angle, its barrel distortion is genuinely significant for
+#       an overhead shot and `dist` should be filled in from `cardetect calibrate intrinsics`.
+intrinsics:
+  width: 1280
+  height: 720
+  hfov_deg: 70.0
+  # vfov_deg: 42.0          # supply if the datasheet quotes it; otherwise fy is taken from hfov
+  # dist: [-0.28, 0.09, 0.0, 0.0, 0.0]   # Brown-Conrady (k1, k2, p1, p2, k3)
+
+# --- Mount geometry --------------------------------------------------------------------
+# @note Height is measured to the LENS ENTRANCE PUPIL and above the ROAD SURFACE the cars run
+#       on.  Measuring to the pole bracket, or to the table rather than the track surface, is a
+#       common and silent source of a constant speed bias equal to the height ratio.
+height_m: 0.85
+
+# --- Optional: two-mark calibration (used when `height_m` is removed) --------------------
+# reference_points_xy: [[520.0, 300.0], [900.0, 300.0]]   # two clicked marks, [u, v] pixels
+# measured_distance_m: 0.3048                              # a standard straight track section
+# image_rotation_deg: 0.0                                  # road axis vs image rows
+
+# --- Stored calibration (written by the calibrate command; wins over the above) -----------
+# calibration:
+#   plane:
+#     matrix: [[0.0021881, 0.0, -1.3993], [0.0, 0.0021881, -0.7866]]
+#     source: height_over_focal_length
+
+# --- Validity ---------------------------------------------------------------------------
+# @note With an overhead rig the whole frame is usable in principle, so the error budget exists
+#       mainly to reject points that fall outside the covered area rather than to gate distance.
+max_error_m: 0.05
+
+# --- Rig-specific overrides -------------------------------------------------------------
+# An overhead camera sees the track from directly above, so a car's box is roughly its footprint
+# and the bottom edge is a good contact reference.  The frame is also much shorter in Z than a
+# street view, so a shorter speed window keeps the estimate local.
+detection_point:
+  mode: bottom_center
+  bottom_offset_px: 0.0
+
+speed:
+  window_s: 0.4
+
+source:
+  # A phone or action camera on a pole usually records 1080p; the overhead geometry tolerates
+  # downscaling well because the ground resolution is set by height/focal length, not by pixels.
+  width: 1280
+  height: 720

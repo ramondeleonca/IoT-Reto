@@ -1,0 +1,48 @@
+cardetect run report
+============================================================
+generated        : 2026-10-06T21:35:17
+frames processed : 56
+wall clock       : 1.71 s
+throughput       : 32.69 fps
+run directory    : /Users/ramon/Documents/Code/IoT-Reto/yolo-cardetect/runs/20261006-213515
+
+effective configuration
+------------------------------------------------------------
+  rig          : topdown (overhead-pole)
+  camera       : 1280x720, hfov 70.0 deg, h=0.85 m
+  calibration  : analytic height/focal-length route (h=0.85 m)
+  detector     : yolo26n.pt @ 640px, conf 0.25, classes [2, 5, 7], device auto
+  tracker      : bytetrack
+  source       : 0 (stream mode)
+  speed window : 0.4 s, max 12.0 m/s, jitter 2.0 px
+  error budget : 0.05 m
+
+source
+------------------------------------------------------------
+  uri             : samples/synthetic_topdown.mp4
+  live            : False
+  mode            : stream
+  reported_fps    : 30.0
+  frame_count     : 56
+  timestamp_source: frame_index / fps (file)
+  size            : [1280, 720]
+
+geometry
+------------------------------------------------------------
+  kind            : topdown
+  label           : overhead-pole
+  m_per_px        : 0.0009299631366847706
+  anisotropy      : 1.0
+  source          : height_over_focal_length
+
+measurements
+------------------------------------------------------------
+  no tracks were formed
+
+artefacts
+------------------------------------------------------------
+  measurements    : /Users/ramon/Documents/Code/IoT-Reto/yolo-cardetect/runs/20261006-213515/measurements.csv
+  tracks          : /Users/ramon/Documents/Code/IoT-Reto/yolo-cardetect/runs/20261006-213515/tracks.json
+  figure          : /Users/ramon/Documents/Code/IoT-Reto/yolo-cardetect/runs/20261006-213515/speed_trace.png
+  figure          : /Users/ramon/Documents/Code/IoT-Reto/yolo-cardetect/runs/20261006-213515/trajectories.png
+  figure          : /Users/ramon/Documents/Code/IoT-Reto/yolo-cardetect/runs/20261006-213515/ground_resolution.png

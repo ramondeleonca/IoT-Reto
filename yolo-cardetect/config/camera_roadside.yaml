@@ -1,0 +1,98 @@
+# Configuration B -- camera on a pole BESIDE the track, pitched down.
+#
+# @file    camera_roadside.yaml
+# @brief   Roadside mounting configuration.
+# @details This is the realistic street view: the camera looks down the road from a pole at the
+#          kerb.  It needs a full projective ground homography, and unlike the overhead rig its
+#          metres-per-pixel degrades steeply with distance, so far-field detections are gated by
+#          the error budget below.
+#
+#          THE IMPORTANT CAVEAT, and the reason this file is longer than the overhead one:
+#          a single measured distance between two marks determines only a similarity
+#          (rotation + scale), NOT a 2D ground homography.  Height and pitch trade off against
+#          each other and cannot both be recovered from one distance.  So exactly one of the
+#          following must accompany `measured_distance_m`:
+#
+#            horizon_row   -- best.  Read the row where the road surface meets the sky, or fit it
+#                             from a long straight road edge.  Pitch then follows exactly.
+#            height_m      -- a tape measurement to the lens, above the road.
+#            pitch_deg     -- from a phone inclinometer, or the mount's documented tilt.
+#
+#          Supplying none of them is an error rather than a guess, deliberately: a wrong height
+#          biases every reported speed by exactly the height ratio, which produces numbers that
+#          look entirely reasonable and would survive to a final report.
+#
+#          If a printed marker is acceptable, the ArUco / four-point route
+#          (`cardetect calibrate roadside --board`) removes the need for any prior at all.
+#
+# Loaded with:  cardetect run --config config/camera_roadside.yaml
+
+kind: roadside
+label: roadside-pole
+
+# --- Camera intrinsics ------------------------------------------------------------------
+# @note A downward-pitched roadside camera is usually a wider lens than an overhead one, and the
+#       distortion matters more here because the homography extrapolates far from the calibration
+#       points.  Calibrating the lens properly is worth the effort on this rig.
+intrinsics:
+  width: 1280
+  height: 720
+  hfov_deg: 70.0
+  # dist: [-0.28, 0.09, 0.0, 0.0, 0.0]
+
+# --- Mount geometry --------------------------------------------------------------------
+# @note Preferred when both are actually measured: this needs no image clicking at all, so there
+#       is no click error to propagate into the scale.
+extrinsics:
+  height_m: 1.5
+  pitch_deg: 35.0
+  yaw_deg: 0.0
+  roll_deg: 0.0
+  along_m: 0.0
+
+# --- Alternative: measured-distance calibration (takes effect if `extrinsics` is removed) --
+# measured_distance_m: 0.3048
+# reference_points_xy: [[600.0, 500.0], [640.0, 420.0]]   # two clicked marks along the road
+# horizon_row: 262.0        # choose exactly one of these three
+# height_m: 1.5
+# pitch_deg: 35.0
+
+# --- Stored calibration (written by the calibrate command; wins over both of the above) ----
+# calibration:
+#   extrinsics:
+#     height_m: 1.5127
+#     pitch_deg: 34.86
+#     yaw_deg: 0.8
+#     roll_deg: -1.2
+#     along_m: 0.0
+
+# --- Validity gating --------------------------------------------------------------------
+# @note This value is doing real work on this rig.  At 35 degrees and 1.5 m with 2 px of detector
+#       jitter, the positional error passes 5 cm at roughly 6 m down the road, and beyond that
+#       point a single far sample can dominate a speed estimate built from a handful of frames.
+#       Raising it sees further at the cost of noisier speeds; lowering it makes near-field
+#       speeds cleaner but shortens the usable stretch of road.
+max_error_m: 0.05
+pixel_sigma_px: 2.0
+
+# --- Rig-specific overrides -------------------------------------------------------------
+# Seen from a rear three-quarter angle on a street, the bottom edge centre of a car's box sits
+# slightly toward the far side of its contact patch, so a small downward offset corrects the
+# residual bias.  Raise it if speeds read consistently high at close range.
+detection_point:
+  mode: bottom_center
+  bottom_offset_px: 2.0
+
+# The sight line is longer than an overhead rig's, so a slightly longer window still describes
+# what the car is doing now while averaging out more detector jitter.
+speed:
+  window_s: 0.6
+  # A real street car is faster than a toy one; raise this if the plausibility bound starts
+  # rejecting legitimate measurements.
+  max_speed_mps: 30.0
+  # A longer window means larger plausible steps between frames.
+  max_step_m: 1.5
+
+source:
+  width: 1280
+  height: 720
